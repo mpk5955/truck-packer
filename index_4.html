@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>AMG Rigging Truck Packer</title>
+<style>
+  :root{
+    --bg:#f4f3ef; --panel:#ffffff; --ink:#1c1c1c; --muted:#6b6b6b;
+    --line:#d8d5cc; --accent:#c1440e; --accent2:#e07a1f; --ok:#2e7d32; --bad:#c62828;
+    --kingpin:#1565c0; --axle:#6a1b9a; --item:#f0c419; --card:#faf9f6;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;}
+  h1,h2,h3{margin:0;}
+  .app-header{position:sticky;top:0;z-index:50;background:var(--panel);
+    border-bottom:1px solid var(--line);padding:10px 14px;}
+  .app-header .title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .app-header h1{font-size:16px;letter-spacing:.3px;}
+  .app-header h1 span{color:var(--accent);}
+  .truck-name-input{flex:1;max-width:220px;border:1px solid var(--line);border-radius:6px;
+    padding:6px 8px;font-size:13px;}
+  .axle-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .axle-pill{flex:1;min-width:90px;background:var(--card);border:1px solid var(--line);
+    border-radius:8px;padding:6px 8px;text-align:center;}
+  .axle-pill .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .axle-pill .value{font-size:14px;font-weight:700;margin-top:2px;}
+  .axle-pill.over{background:#fdecea;border-color:#f2b6b0;}
+  .axle-pill.over .value{color:var(--bad);}
+  .axle-pill.ok .value{color:var(--ok);}
+  .tabs{display:flex;gap:4px;margin-top:10px;}
+  .tab-btn{flex:1;padding:8px 6px;border:1px solid var(--line);background:var(--card);
+    border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);}
+  .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  main{padding:12px 14px 90px;max-width:900px;margin:0 auto;}
+  .hidden{display:none !important;}
+
+  /* Packer tab */
+  .tray{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;}
+  .tray-chip{flex:0 0 auto;background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:8px 14px;font-size:13px;font-weight:600;white-space:nowrap;}
+  .tray-chip:active{background:var(--accent2);color:#fff;}
+  .layer-target-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--muted);}
+  .layer-target-row select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:12px;}
+  .stack-btns{display:flex;gap:8px;margin-bottom:14px;}
+  .stack-btns button{background:var(--card);border:1px solid var(--line);border-radius:8px;
+    padding:6px 10px;font-size:12px;font-weight:600;color:var(--ink);}
+  .layer-panel-wrap{margin-bottom:16px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;}
+  .layer-panel-head{display:flex;align-items:center;justify-content:space-between;
+    padding:6px 10px;background:var(--card);border-bottom:1px solid var(--line);}
+  .layer-panel-head .name{font-size:12px;font-weight:700;}
+  .layer-panel-head button{background:none;border:none;font-size:11px;color:var(--bad);font-weight:600;}
+  .layer-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;}
+  .layer-surface{position:relative;background:
+      repeating-linear-gradient(90deg, transparent, transparent 23px, rgba(0,0,0,.035) 23px, rgba(0,0,0,.035) 24px);
+    }
+  .layer-surface{user-select:none;}
+  .scale-ruler{position:relative;height:20px;background:#efece4;user-select:none;}
+  .scale-tick{position:absolute;bottom:0;width:1px;background:#b3aea0;}
+  .scale-tick.major{background:#5b5850;}
+  .scale-label{position:absolute;bottom:2px;font-size:8px;font-weight:700;color:#5b5850;
+    transform:translateX(-50%);white-space:nowrap;}
+  .guide-line{position:absolute;top:0;bottom:0;width:2px;z-index:1;pointer-events:none;}
+  .guide-line.kingpin{background:var(--kingpin);}
+  .guide-line.axle{background:var(--axle);}
+  .guide-label{position:absolute;top:2px;font-size:9px;font-weight:700;color:#fff;
+    padding:1px 4px;border-radius:3px;z-index:2;white-space:nowrap;pointer-events:none;}
+  .guide-label.kingpin{background:var(--kingpin);}
+  .guide-label.axle{background:var(--axle);}
+  .placed-item{position:absolute;border-radius:5px;border:1px solid #4a4a4a;
+    background:var(--item);display:flex;align-items:center;justify-content:center;
+    text-align:center;padding:2px;touch-action:none;user-select:none;z-index:3;}
+  .placed-item .pi-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    line-height:1.15;pointer-events:none;}
+  .placed-item .pi-name{font-size:9px;font-weight:600;color:#1c1c1c;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis;}
+  .placed-item .pi-weight{font-size:9px;font-weight:800;color:#1c1c1c;}
+  .placed-item.locked{opacity:.85;border-style:dashed;}
+  .placed-item.dragging{z-index:999;box-shadow:0 4px 10px rgba(0,0,0,.35);}
+  .placed-item .lock-badge{position:absolute;bottom:1px;left:1px;font-size:8px;}
+  .placed-item.selected{outline:2px solid #1565c0;outline-offset:-2px;}
+  .placed-item .select-badge{position:absolute;top:1px;left:1px;background:#1565c0;color:#fff;
+    font-size:9px;font-weight:800;border-radius:3px;padding:0 3px;line-height:1.3;pointer-events:none;}
+  .placed-item .item-menu-btn{position:absolute;top:1px;right:1px;background:#212121;color:#fff;
+    font-size:10px;font-weight:800;border-radius:3px;padding:0 4px;line-height:1.5;border:none;}
+  .marquee-box{position:absolute;border:1.5px dashed #1565c0;background:rgba(21,101,192,.12);
+    z-index:500;pointer-events:none;}
+  .selection-bar{position:fixed;left:0;right:0;bottom:58px;z-index:55;background:#1565c0;color:#fff;
+    display:flex;align-items:center;justify-content:space-between;padding:8px 14px;font-size:13px;font-weight:700;}
+  .selection-bar button{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:6px;
+    padding:6px 10px;font-size:12px;font-weight:700;margin-left:6px;}
+
+  /* Library */
+  .lib-item{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+  .lib-item .fields{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .lib-item .fields .full{grid-column:1/3;}
+  .lib-item label{font-size:10px;color:var(--muted);display:block;margin-bottom:2px;}
+  .lib-item input{width:100%;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px;}
+  .lib-item .del-btn{background:none;border:1px solid var(--bad);color:var(--bad);border-radius:6px;
+    padding:8px 10px;font-size:11px;font-weight:700;align-self:flex-start;}
+  .add-lib-btn{width:100%;padding:12px;border:2px dashed var(--line);border-radius:10px;
+    background:none;color:var(--accent);font-weight:700;font-size:13px;margin-top:6px;}
+
+  /* Settings */
+  .settings-group{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:12px;margin-bottom:12px;}
+  .settings-group h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+    margin-bottom:8px;}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .settings-grid label{font-size:11px;color:var(--muted);display:block;margin-bottom:2px;}
+  .settings-grid input{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 7px;font-size:13px;}
+  .reset-btn{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);
+    font-size:13px;font-weight:600;color:var(--muted);}
+
+  /* Bottom action bar */
+  .bottom-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);
+    border-top:1px solid var(--line);display:flex;gap:8px;padding:10px 14px;z-index:60;}
+  .bottom-bar button{flex:1;padding:11px 6px;border-radius:8px;border:none;font-size:12px;font-weight:700;}
+  .btn-save{background:var(--accent);color:#fff;}
+  .btn-open{background:var(--card);border:1px solid var(--line) !important;color:var(--ink);}
+  .btn-print{background:#212121;color:#fff;}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;
+    display:flex;align-items:flex-end;justify-content:center;}
+  .modal{background:var(--panel);width:100%;max-width:520px;border-radius:14px 14px 0 0;
+    padding:18px 16px 22px;max-height:82vh;overflow-y:auto;}
+  @media(min-width:560px){
+    .modal-overlay{align-items:center;}
+    .modal{border-radius:14px;}
+  }
+  .modal h2{font-size:15px;margin-bottom:12px;}
+  .modal .field{margin-bottom:10px;}
+  .modal label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;}
+  .modal input,.modal select{width:100%;border:1px solid var(--line);border-radius:7px;padding:9px;font-size:14px;}
+  .modal-actions{display:flex;gap:8px;margin-top:16px;}
+  .modal-actions button{flex:1;padding:11px;border-radius:8px;border:none;font-size:13px;font-weight:700;}
+  .m-primary{background:var(--accent);color:#fff;}
+  .m-danger{background:var(--bad);color:#fff;}
+  .m-secondary{background:var(--card);border:1px solid var(--line) !important;color:var(--ink);}
+  .m-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:20px;color:var(--muted);}
+  .saved-load-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:10px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;}
+  .saved-load-row .info .name{font-weight:700;font-size:13px;}
+  .saved-load-row .info .meta{font-size:11px;color:var(--muted);}
+  .saved-load-row .actions{display:flex;gap:6px;}
+  .saved-load-row .actions button{padding:6px 9px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--line);background:var(--card);}
+  .saved-load-row .actions .open-btn{border-color:var(--accent);color:var(--accent);}
+  .saved-load-row .actions .del-btn{border-color:var(--bad);color:var(--bad);}
+  .color-swatches{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .swatch{width:30px;height:30px;border-radius:50%;border:2px solid transparent;}
+  .swatch.selected{border-color:#212121;}
+  .empty-note{color:var(--muted);font-size:13px;text-align:center;padding:20px 10px;}
+  .zone-tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff;margin-left:5px;}
+  .undo-toast{position:fixed;left:50%;bottom:70px;transform:translate(-50%,20px);z-index:300;
+    background:#212121;color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;
+    display:flex;align-items:center;gap:12px;opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .2s;box-shadow:0 4px 14px rgba(0,0,0,.3);}
+  .undo-toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto;}
+  .undo-toast button{background:var(--item);color:#1c1c1c;border:none;border-radius:5px;
+    padding:6px 11px;font-size:12px;font-weight:800;}
+
+  /* Print */
+  #printArea{display:none;}
+  @page{size:landscape;margin:10mm;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block;position:absolute;top:0;left:0;width:100%;
+      /* Without this, most browsers silently drop background colors when
+         printing unless the user manually checks "Background graphics" in
+         the print dialog -- this forces item and status colors to print
+         regardless of that setting. */
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;}
+    #printArea *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;}
+    .no-print{display:none !important;}
+  }
+  .print-title{font-size:18px;font-weight:800;margin-bottom:2px;}
+  .print-sub{font-size:12px;color:#555;margin-bottom:14px;}
+  .print-axle-table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;}
+  .print-axle-table th,.print-axle-table td{border:1px solid #999;padding:5px 8px;text-align:left;}
+  .print-layer-title{font-size:12px;font-weight:700;margin:10px 0 4px;}
+  .print-layer-surface{position:relative;border:1px solid #999;margin-bottom:10px;}
+  .print-item{position:absolute;border:1px solid #333;background:#f0c419;display:flex;
+    align-items:center;justify-content:center;text-align:center;font-size:8px;padding:1px;}
+</style>
+</head>
+<body>
+
+<header class="app-header no-print">
+  <div class="title-row">
+    <h1>AMG <span>Rigging</span> Truck Packer</h1>
+  </div>
+  <div class="title-row" style="margin-top:8px;">
+    <input id="truckNameInput" class="truck-name-input" placeholder="Truck / trailer name">
+    <div style="display:flex;gap:6px;">
+      <button id="undoBtn" title="Undo" style="border:1px solid var(--line);background:var(--card);border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;">↩ Undo</button>
+    </div>
+  </div>
+  <div class="axle-row" id="axleRow"></div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="packer">Packer</button>
+    <button class="tab-btn" data-tab="library">Library</button>
+    <button class="tab-btn" data-tab="settings">Settings</button>
+  </div>
+</header>
+
+<main>
+  <section id="tab-packer">
+    <div class="tray" id="tray"></div>
+    <div class="layer-target-row">
+      Add new items to:
+      <select id="addToLayerSelect"></select>
+    </div>
+    <div class="stack-btns" id="stackBtns"></div>
+    <div id="layerPanels"></div>
+  </section>
+
+  <section id="tab-library" class="hidden">
+    <div id="libraryList"></div>
+    <button class="add-lib-btn" id="addLibBtn">+ Add Library Item</button>
+  </section>
+
+  <section id="tab-settings" class="hidden">
+    <div id="settingsForm"></div>
+    <button class="reset-btn" id="resetSettingsBtn">Reset to defaults</button>
+  </section>
+</main>
+
+<div class="selection-bar hidden no-print" id="selectionBar">
+  <span id="selectionCountText">0 selected</span>
+  <div>
+    <button id="selectionActionsBtn">Actions</button>
+    <button id="selectionClearBtn">✕ Clear</button>
+  </div>
+</div>
+
+<div class="bottom-bar no-print">
+  <button class="btn-open" id="openLoadsBtn">Saved Loads</button>
+  <button class="btn-save" id="saveLoadBtn">Save Load</button>
+  <button class="btn-print" id="printBtn">Print</button>
+</div>
+
+<div id="modalRoot"></div>
+<div id="printArea"></div>
+
+<script>
+(function(){
+"use strict";
+
+const PX_PER_IN = 2; // matches native app's scale
+
+// ---------- Defaults ----------
+function defaultLibrary(){
+  return [
+    {id: uid(), name:"1/3 Pack", lengthIn:45, widthIn:30, weightLbs:200},
+    {id: uid(), name:"1/4 Pack", lengthIn:45, widthIn:22.5, weightLbs:300}
+  ];
+}
+function defaultTruckConfig(){
+  return {
+    trailerLengthIn:636, trailerWidthIn:102,
+    kingpinOffsetFromNoseIn:36, kingpinToTrailerAxleIn:480,
+    wheelbaseIn:260, kingpinOffsetFromDriveIn:0,
+    steerTareLbs:11000, driveTareLbs:9000, trailerTareLbs:13500,
+    steerLimitLbs:12000, driveLimitLbs:34000, trailerLimitLbs:34000,
+    grossWeightLimitLbs:80000
+  };
+}
+function uid(){ return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9); }
+
+// ---------- Persistence ----------
+const LS = {
+  library:'tp_library', truckName:'tp_truckName', savedLoads:'tp_savedLoads', working:'tp_working'
+};
+function loadJSON(key, fallback){
+  try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+  catch(e){ return fallback; }
+}
+function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+let state = {
+  library: loadJSON(LS.library, null),
+  savedLoads: loadJSON(LS.savedLoads, []),
+  placedItems: [], activeLayers:[1], truckConfig: defaultTruckConfig(), truckName:'',
+  addToLayer: 1, selectedItemIds: []
+};
+let libraryWasDefaulted = false;
+if(!state.library){
+  state.library = defaultLibrary();
+  libraryWasDefaulted = true;
+}
+// Restore in-progress working layout (an improvement over the native app,
+// which only remembers named "Saved Loads" and loses the current unsaved
+// layout if the app/tab is closed -- exactly the kind of loss that caused
+// the reload bug we fixed there. Auto-saving here avoids that class of bug
+// entirely for the web version.)
+const working = loadJSON(LS.working, null);
+if(working){
+  state.placedItems = working.placedItems || [];
+  state.activeLayers = working.activeLayers || [1];
+  state.truckConfig = Object.assign(defaultTruckConfig(), working.truckConfig || {});
+  state.truckName = working.truckName || '';
+} else {
+  state.truckName = localStorage.getItem(LS.truckName) || '';
+}
+if(libraryWasDefaulted) persistLibrary();
+persistWorking();
+
+let undoStack = [];
+let itemElById = {}; // item id -> its live DOM element, refreshed each renderLayerPanels() pass
+function pushUndo(){
+  undoStack.push(JSON.parse(JSON.stringify({
+    placedItems: state.placedItems, activeLayers: state.activeLayers,
+    truckConfig: state.truckConfig, truckName: state.truckName,
+    library: state.library // covers library edits/deletes now that those skip their confirm dialog too
+  })));
+  if(undoStack.length > 5) undoStack.shift();
+}
+function doUndo(){
+  const snap = undoStack.pop();
+  if(!snap) return;
+  state.placedItems = snap.placedItems; state.activeLayers = snap.activeLayers;
+  state.truckConfig = snap.truckConfig; state.truckName = snap.truckName;
+  if(snap.library){ state.library = snap.library; persistLibrary(); }
+  persistWorking(); renderAll();
+}
+
+function persistLibrary(){ saveJSON(LS.library, state.library); }
+function persistSavedLoads(){ saveJSON(LS.savedLoads, state.savedLoads); }
+
+// A brief toast + Undo button standing in for a confirm dialog on saved-load
+// deletion specifically -- the one destructive action here with no undo-stack
+// coverage at all, so it's the one place removing the confirm still needs a
+// safety net.
+let lastDeletedLoad = null, undoToastTimer = null;
+function showUndoDeleteToast(load){
+  lastDeletedLoad = load;
+  let toast = document.getElementById('undoToast');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'undoToast';
+    toast.className = 'undo-toast';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span>Deleted "${escapeHtml(load.name)}"</span><button id="undoToastBtn" type="button">Undo</button>`;
+  document.getElementById('undoToastBtn').addEventListener('click', ()=>{
+    if(!lastDeletedLoad) return;
+    state.savedLoads.push(lastDeletedLoad);
+    persistSavedLoads();
+    lastDeletedLoad = null;
+    toast.classList.remove('show');
+    if(document.getElementById('loadsOverlay')) openLoadsModal();
+  });
+  requestAnimationFrame(()=> toast.classList.add('show'));
+  clearTimeout(undoToastTimer);
+  undoToastTimer = setTimeout(()=>{ toast.classList.remove('show'); lastDeletedLoad = null; }, 6000);
+}
+function persistWorking(){
+  saveJSON(LS.working, {
+    placedItems: state.placedItems, activeLayers: state.activeLayers,
+    truckConfig: state.truckConfig, truckName: state.truckName
+  });
+  localStorage.setItem(LS.truckName, state.truckName);
+}
+
+function libById(id){ return state.library.find(l => l.id === id); }
+function footprintLen(item, lib){ return item.rotated ? lib.widthIn : lib.lengthIn; }
+function footprintWid(item, lib){ return item.rotated ? lib.lengthIn : lib.widthIn; }
+function displayName(item, lib){ return item.customName != null && item.customName !== '' ? item.customName : lib.name; }
+function displayWeight(item, lib){ return item.customWeightLbs != null ? item.customWeightLbs : lib.weightLbs; }
+
+// ---------- Multi-select ----------
+// Selection itself isn't undoable/persisted -- matches the native app, where
+// selectedItemIds lives outside the undo snapshot and outside saved prefs.
+function isSelected(id){ return state.selectedItemIds.includes(id); }
+function toggleSelected(id){
+  const idx = state.selectedItemIds.indexOf(id);
+  if(idx>=0) state.selectedItemIds.splice(idx,1); else state.selectedItemIds.push(id);
+  renderSelectionUI();
+}
+function clearSelection(){
+  if(state.selectedItemIds.length===0) return;
+  state.selectedItemIds = [];
+  renderSelectionUI();
+}
+function addToSelection(ids){
+  ids.forEach(id=>{ if(!state.selectedItemIds.includes(id)) state.selectedItemIds.push(id); });
+  renderSelectionUI();
+}
+function selectedPlacedItems(){
+  return state.placedItems.filter(it=>state.selectedItemIds.includes(it.id));
+}
+function renderSelectionUI(){
+  const bar = document.getElementById('selectionBar');
+  const n = state.selectedItemIds.length;
+  bar.classList.toggle('hidden', n===0);
+  document.getElementById('selectionCountText').textContent = n + (n===1?' item selected':' items selected');
+  renderLayerPanels();
+}
+
+// Group drag, ported from the native app's moveSelectedBy: every selected,
+// unlocked item moves by the same delta from where IT started, but if the
+// group is heading toward a trailer edge, the delta is capped by whichever
+// item would hit that edge FIRST -- so the whole group stops together
+// instead of items overlapping as the first one to reach the wall stops
+// while the rest keep going. Deltas are computed from a fixed start snapshot
+// (not accumulated tick-by-tick) so there's no drift from repeated clamping.
+function moveSelectedByFromStart(startPositions, dxIn, dyIn){
+  const items = state.placedItems.filter(it=>state.selectedItemIds.includes(it.id) && !it.locked);
+  if(items.length===0) return;
+  let allowedDx = dxIn, allowedDy = dyIn;
+  items.forEach(item=>{
+    const lib = libById(item.libraryItemId); if(!lib) return;
+    const start = startPositions[item.id]; if(!start) return;
+    const lenIn = footprintLen(item, lib), widIn = footprintWid(item, lib);
+    const maxX = Math.max(0, state.truckConfig.trailerLengthIn - lenIn);
+    const maxY = Math.max(0, state.truckConfig.trailerWidthIn - widIn);
+    if(allowedDx > 0) allowedDx = Math.min(allowedDx, maxX - start.xIn);
+    else if(allowedDx < 0) allowedDx = Math.max(allowedDx, 0 - start.xIn);
+    if(allowedDy > 0) allowedDy = Math.min(allowedDy, maxY - start.yIn);
+    else if(allowedDy < 0) allowedDy = Math.max(allowedDy, 0 - start.yIn);
+  });
+  items.forEach(item=>{
+    const start = startPositions[item.id]; if(!start) return;
+    item.xIn = start.xIn + allowedDx;
+    item.yIn = start.yIn + allowedDy;
+  });
+}
+
+function rotateSelected(){
+  if(state.selectedItemIds.length===0) return;
+  pushUndo();
+  selectedPlacedItems().forEach(item=>{
+    const lib = libById(item.libraryItemId); if(!lib) return;
+    item.rotated = !item.rotated;
+    const maxXIn = Math.max(0, state.truckConfig.trailerLengthIn - footprintLen(item, lib));
+    const maxYIn = Math.max(0, state.truckConfig.trailerWidthIn - footprintWid(item, lib));
+    item.xIn = clamp(item.xIn, 0, maxXIn);
+    item.yIn = clamp(item.yIn, 0, maxYIn);
+  });
+  persistWorking(); renderAll(); renderSelectionUI();
+}
+function lockSelected(locked){
+  if(state.selectedItemIds.length===0) return;
+  pushUndo();
+  selectedPlacedItems().forEach(item=> item.locked = locked);
+  persistWorking(); renderSelectionUI();
+}
+function removeSelected(){
+  if(state.selectedItemIds.length===0) return;
+  pushUndo();
+  state.placedItems = state.placedItems.filter(it=>!state.selectedItemIds.includes(it.id));
+  state.selectedItemIds = [];
+  persistWorking(); renderAll(); renderSelectionUI();
+}
+function copySelected(){
+  if(state.selectedItemIds.length===0) return;
+  pushUndo();
+  const toCopy = selectedPlacedItems();
+  const newIds = [];
+  toCopy.forEach(src=>{
+    const lib = libById(src.libraryItemId); if(!lib) return;
+    const maxXIn = Math.max(0, state.truckConfig.trailerLengthIn - footprintLen(src, lib));
+    const copy = Object.assign({}, src, {id: uid(), xIn: clamp(src.xIn+12,0,maxXIn)});
+    state.placedItems.push(copy);
+    newIds.push(copy.id);
+  });
+  state.selectedItemIds = newIds; // the new copies become the selection, ready to drag into place
+  persistWorking(); renderAll(); renderSelectionUI();
+}
+function moveSelectedToLayer(layer){
+  if(state.selectedItemIds.length===0) return;
+  pushUndo();
+  selectedPlacedItems().forEach(item=> item.layer = layer);
+  persistWorking(); renderAll(); renderSelectionUI();
+}
+function copySelectedToLayer(layer){
+  if(state.selectedItemIds.length===0) return;
+  pushUndo();
+  const toCopy = selectedPlacedItems();
+  const newIds = [];
+  toCopy.forEach(src=>{
+    const copy = Object.assign({}, src, {id: uid(), layer});
+    state.placedItems.push(copy);
+    newIds.push(copy.id);
+  });
+  state.selectedItemIds = newIds;
+  persistWorking(); renderAll(); renderSelectionUI();
+}
+function updateSelectedDetails(name, weightLbs){
+  if(state.selectedItemIds.length===0) return;
+  if(!name && (weightLbs==null || isNaN(weightLbs))) return; // nothing to apply
+  pushUndo();
+  selectedPlacedItems().forEach(item=>{
+    const lib = libById(item.libraryItemId); if(!lib) return;
+    if(name) item.customName = (name!==lib.name) ? name : null;
+    if(weightLbs != null && !isNaN(weightLbs)){
+      item.customWeightLbs = (weightLbs !== lib.weightLbs) ? weightLbs : null;
+    }
+  });
+  persistWorking(); renderAll(); renderSelectionUI();
+}
+function updateSelectedColor(color){
+  if(state.selectedItemIds.length===0) return;
+  pushUndo();
+  selectedPlacedItems().forEach(item=> item.customColor = color);
+  persistWorking(); renderLayerPanels();
+}
+
+// ---------- Axle math (ported 1:1 from AxleMath.kt) ----------
+function computeAxleWeights(placedItems, config){
+  let steerAdd=0, driveAdd=0, trailerAdd=0;
+  const kingpinXFromSteerIn = config.wheelbaseIn - config.kingpinOffsetFromDriveIn;
+  for(const item of placedItems){
+    const lib = libById(item.libraryItemId);
+    if(!lib) continue;
+    const weight = displayWeight(item, lib);
+    const d = item.xIn - config.kingpinOffsetFromNoseIn;
+    let loadToTrailerAxle, loadToKingpin;
+    if(d <= 0){ loadToTrailerAxle = 0; loadToKingpin = weight; }
+    else {
+      loadToTrailerAxle = weight * (d / config.kingpinToTrailerAxleIn);
+      loadToKingpin = weight - loadToTrailerAxle;
+    }
+    const loadToDrive = loadToKingpin * (kingpinXFromSteerIn / config.wheelbaseIn);
+    const loadToSteer = loadToKingpin - loadToDrive;
+    trailerAdd += loadToTrailerAxle; driveAdd += loadToDrive; steerAdd += loadToSteer;
+  }
+  return {
+    steerTotal: config.steerTareLbs + steerAdd,
+    driveTotal: config.driveTareLbs + driveAdd,
+    trailerTotal: config.trailerTareLbs + trailerAdd,
+    steerLimit: config.steerLimitLbs, driveLimit: config.driveLimitLbs, trailerLimit: config.trailerLimitLbs
+  };
+}
+
+// ---------- Rendering ----------
+const layerNames = {1:'Floor', 2:'Stack Layer 2', 3:'Stack Layer 3'};
+
+function renderAll(){
+  renderAxleRow();
+  renderTray();
+  renderAddToLayerSelect();
+  renderStackButtons();
+  renderLayerPanels();
+  renderLibraryTab();
+  renderSettingsTab();
+  document.getElementById('truckNameInput').value = state.truckName;
+}
+
+function renderAxleRow(){
+  const axle = computeAxleWeights(state.placedItems, state.truckConfig);
+  const row = document.getElementById('axleRow');
+  function pill(label, total, limit){
+    const over = total > limit;
+    return `<div class="axle-pill ${over?'over':'ok'}">
+      <div class="label">${label}</div>
+      <div class="value">${Math.round(total).toLocaleString()} lb</div>
+      <div style="font-size:9px;color:${over?'#c62828':'#8a8a8a'};">limit ${Math.round(limit).toLocaleString()}</div>
+    </div>`;
+  }
+  row.innerHTML = pill('Steer', axle.steerTotal, axle.steerLimit)
+    + pill('Drive', axle.driveTotal, axle.driveLimit)
+    + pill('Trailer', axle.trailerTotal, axle.trailerLimit);
+}
+
+function renderTray(){
+  const tray = document.getElementById('tray');
+  tray.innerHTML = state.library.map(li =>
+    `<button class="tray-chip" data-libid="${li.id}">${escapeHtml(li.name)} (${Math.round(li.weightLbs)} lb)</button>`
+  ).join('');
+  tray.querySelectorAll('.tray-chip').forEach(btn=>{
+    btn.addEventListener('click', ()=> addItemToLayer(btn.dataset.libid, state.addToLayer));
+  });
+}
+
+function renderAddToLayerSelect(){
+  const sel = document.getElementById('addToLayerSelect');
+  sel.innerHTML = state.activeLayers.map(l => `<option value="${l}">${layerNames[l]}</option>`).join('');
+  sel.value = state.addToLayer;
+  sel.onchange = ()=> state.addToLayer = parseInt(sel.value,10);
+}
+
+function renderStackButtons(){
+  const wrap = document.getElementById('stackBtns');
+  wrap.innerHTML = '';
+  [2,3].forEach(l=>{
+    if(!state.activeLayers.includes(l)){
+      const b = document.createElement('button');
+      b.textContent = '+ Stack Layer '+l;
+      b.addEventListener('click', ()=>{
+        pushUndo();
+        state.activeLayers.push(l);
+        state.addToLayer = l;
+        persistWorking(); renderAll();
+      });
+      wrap.appendChild(b);
+    }
+  });
+}
+
+function addItemToLayer(libId, layer, atXIn){
+  pushUndo();
+  const lib = libById(libId);
+  const lengthIn = lib ? lib.lengthIn : 0;
+  const maxXIn = Math.max(0, state.truckConfig.trailerLengthIn - lengthIn);
+  const xIn = Math.min(Math.max(atXIn != null ? atXIn : 12, 0), maxXIn);
+  state.placedItems.push({
+    id: uid(), libraryItemId: libId, layer, xIn, yIn:12, rotated:false,
+    customName:null, customWeightLbs:null, customColor:null, locked:false
+  });
+  persistWorking(); renderAll();
+}
+
+// On a wide-enough screen, let the page grow to fit the whole trailer length
+// at full scale instead of scrolling -- the scale itself (PX_PER_IN) never
+// changes, only how much of it fits on screen at once. On narrower screens
+// this just falls back to the CSS default (900px) and each panel scrolls as
+// before. No resize listener needed: max-width plus the browser's own
+// shrink-to-fit handles both directions automatically.
+function updateMainWidth(){
+  const neededPx = state.truckConfig.trailerLengthIn * PX_PER_IN
+    + 2   // layer-panel-wrap border
+    + 28; // main's left+right padding
+  document.querySelector('main').style.maxWidth = Math.max(900, neededPx) + 'px';
+}
+
+// A feet ruler sized and scaled identically to the layer surface beneath it,
+// living inside the SAME horizontally-scrolling container -- so it scrolls
+// in lockstep with whichever layer panel it sits above, with no separate
+// scroll-sync code needed.
+function buildScaleRuler(cfg){
+  const ruler = document.createElement('div');
+  ruler.className = 'scale-ruler';
+  const widthPx = cfg.trailerLengthIn * PX_PER_IN;
+  ruler.style.width = widthPx + 'px';
+  const totalFeet = Math.floor(cfg.trailerLengthIn / 12);
+  // Stops short of totalFeet -- the explicit end-cap tick/label below already
+  // marks that exact position (right-aligned to the true edge), so including
+  // it here too would draw a duplicate, non-aligned tick 1px past the
+  // trailer's real boundary.
+  for(let ft=0; ft<totalFeet; ft++){
+    const xPx = ft * 12 * PX_PER_IN;
+    const isMajor = ft % 5 === 0;
+    const tick = document.createElement('div');
+    tick.className = 'scale-tick' + (isMajor ? ' major' : '');
+    tick.style.left = xPx + 'px';
+    tick.style.height = (isMajor ? '11px' : '5px');
+    ruler.appendChild(tick);
+    if(isMajor){
+      const label = document.createElement('div');
+      label.className = 'scale-label';
+      label.style.left = xPx + 'px';
+      label.textContent = ft + "'";
+      ruler.appendChild(label);
+    }
+  }
+  // End cap at the trailer's true configured length, even if it isn't a
+  // whole foot or a multiple of 5 (the default 53' is exact, but Settings
+  // lets this be edited to anything).
+  const endPx = widthPx;
+  const endTick = document.createElement('div');
+  endTick.className = 'scale-tick major';
+  endTick.style.left = endPx + 'px'; endTick.style.height = '11px';
+  endTick.style.transform = 'translateX(-100%)'; // right edge flush with the true trailer end, not 1px past it
+  ruler.appendChild(endTick);
+  const endLabel = document.createElement('div');
+  endLabel.className = 'scale-label';
+  endLabel.style.left = endPx + 'px';
+  // Right-align (instead of the usual center) so this label never pokes past
+  // the trailer's true right edge and forces a sliver of extra scroll room.
+  endLabel.style.transform = 'translateX(-100%)';
+  const feetExact = cfg.trailerLengthIn / 12;
+  endLabel.textContent = (Number.isInteger(feetExact) ? feetExact : feetExact.toFixed(1)) + "'";
+  ruler.appendChild(endLabel);
+  return ruler;
+}
+
+function renderLayerPanels(){
+  updateMainWidth();
+  const root = document.getElementById('layerPanels');
+  root.innerHTML = '';
+  itemElById = {};
+  const cfg = state.truckConfig;
+  const surfaceWidthPx = cfg.trailerLengthIn * PX_PER_IN;
+  const surfaceHeightPx = cfg.trailerWidthIn * PX_PER_IN;
+  const kingpinX = cfg.kingpinOffsetFromNoseIn * PX_PER_IN;
+  const axleX = (cfg.kingpinOffsetFromNoseIn + cfg.kingpinToTrailerAxleIn) * PX_PER_IN;
+
+  state.activeLayers.forEach(layer=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'layer-panel-wrap';
+    const head = document.createElement('div');
+    head.className = 'layer-panel-head';
+    head.innerHTML = `<div class="name">${layerNames[layer]}</div>`;
+    if(layer !== 1){
+      const rm = document.createElement('button');
+      rm.textContent = 'Remove layer';
+      rm.addEventListener('click', ()=>{
+        pushUndo(); // Undo (top bar) restores this layer and its items if removed by mistake
+        state.activeLayers = state.activeLayers.filter(l=>l!==layer);
+        state.placedItems = state.placedItems.filter(it=>it.layer!==layer);
+        if(state.addToLayer === layer) state.addToLayer = 1;
+        persistWorking(); renderAll();
+      });
+      head.appendChild(rm);
+    }
+    wrap.appendChild(head);
+
+    const scrollWrap = document.createElement('div');
+    scrollWrap.className = 'layer-scroll';
+    const surface = document.createElement('div');
+    surface.className = 'layer-surface';
+    surface.style.width = surfaceWidthPx+'px';
+    surface.style.height = surfaceHeightPx+'px';
+
+    const kLine = document.createElement('div');
+    kLine.className='guide-line kingpin'; kLine.style.left=kingpinX+'px';
+    surface.appendChild(kLine);
+    const kLabel = document.createElement('div');
+    kLabel.className='guide-label kingpin'; kLabel.style.left=(kingpinX+3)+'px';
+    kLabel.textContent='Kingpin'; surface.appendChild(kLabel);
+
+    const aLine = document.createElement('div');
+    aLine.className='guide-line axle'; aLine.style.left=axleX+'px';
+    surface.appendChild(aLine);
+    const aLabel = document.createElement('div');
+    aLabel.className='guide-label axle'; aLabel.style.left=(axleX+3)+'px';
+    aLabel.textContent='Trailer Axle'; surface.appendChild(aLabel);
+
+    state.placedItems.filter(it=>it.layer===layer).forEach(it=>{
+      const lib = libById(it.libraryItemId);
+      if(!lib) return; // matches native behavior: unmatched items just don't render
+      surface.appendChild(buildItemEl(it, lib));
+    });
+    attachSurfaceSelection(surface, layer);
+
+    scrollWrap.appendChild(buildScaleRuler(cfg));
+    scrollWrap.appendChild(surface);
+    wrap.appendChild(scrollWrap);
+    root.appendChild(wrap);
+  });
+}
+
+function buildItemEl(item, lib){
+  const el = document.createElement('div');
+  el.className = 'placed-item'+(item.locked?' locked':'')+(isSelected(item.id)?' selected':'');
+  const lenIn = footprintLen(item, lib), widIn = footprintWid(item, lib);
+  el.style.width = (lenIn*PX_PER_IN)+'px';
+  el.style.height = (widIn*PX_PER_IN)+'px';
+  el.style.left = (item.xIn*PX_PER_IN)+'px';
+  el.style.top = (item.yIn*PX_PER_IN)+'px';
+  el.style.background = item.customColor || '#f0c419';
+
+  const inner = document.createElement('div');
+  inner.className = 'pi-inner';
+  const nameEl = document.createElement('div'); nameEl.className='pi-name'; nameEl.textContent = displayName(item, lib);
+  const wEl = document.createElement('div'); wEl.className='pi-weight'; wEl.textContent = Math.round(displayWeight(item, lib))+' lb';
+  inner.appendChild(nameEl); inner.appendChild(wEl);
+  el.appendChild(inner);
+
+  if(isSelected(item.id)){
+    const sb = document.createElement('div'); sb.className='select-badge'; sb.textContent='✓';
+    el.appendChild(sb);
+  }
+  if(item.locked){
+    const lb = document.createElement('div'); lb.className='lock-badge'; lb.textContent='🔒';
+    el.appendChild(lb);
+  }
+
+  // Always-visible per-item menu, independent of tap-to-select: matches the
+  // native app's behavior where this opens single-item actions when nothing
+  // is selected, or the same batch actions as everything else selected when
+  // a selection is active -- so editing one item never requires selecting it
+  // first, but batch tools stay one tap away once you've built a selection.
+  const menuBtn = document.createElement('button');
+  menuBtn.className = 'item-menu-btn'; menuBtn.type = 'button'; menuBtn.textContent = '⋮';
+  menuBtn.addEventListener('pointerdown', e=> e.stopPropagation());
+  menuBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    if(state.selectedItemIds.length>0) openBatchModal(); else openItemModal(item, lib);
+  });
+  el.appendChild(menuBtn);
+
+  attachDrag(el, item, lib);
+  itemElById[item.id] = el;
+  return el;
+}
+
+function attachDrag(el, item, lib){
+  let startX=0, startY=0, startXIn=item.xIn, startYIn=item.yIn, moved=false, pointerId=null;
+  let isGroup=false, groupStartPositions=null;
+  const maxXIn = () => Math.max(0, state.truckConfig.trailerLengthIn - footprintLen(item, lib));
+  const maxYIn = () => Math.max(0, state.truckConfig.trailerWidthIn - footprintWid(item, lib));
+
+  el.addEventListener('pointerdown', (e)=>{
+    if(item.locked) return;
+    pointerId = e.pointerId;
+    el.setPointerCapture(pointerId);
+    startX = e.clientX; startY = e.clientY;
+    startXIn = item.xIn; startYIn = item.yIn;
+    moved = false;
+    // Dragging a selected item, when more than one item is selected, drags
+    // the whole group together -- matches the native app's isGroupDrag check
+    // (this item must itself be part of the selection, not just *a*
+    // selection existing elsewhere).
+    isGroup = isSelected(item.id) && state.selectedItemIds.length > 1;
+    if(isGroup){
+      groupStartPositions = {};
+      selectedPlacedItems().forEach(it=>{ groupStartPositions[it.id] = {xIn: it.xIn, yIn: it.yIn}; });
+    }
+    pushUndo();
+    e.stopPropagation();
+  });
+  el.addEventListener('pointermove', (e)=>{
+    if(pointerId === null || e.pointerId !== pointerId) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if(Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+    if(!moved) return;
+    el.classList.add('dragging');
+    if(isGroup){
+      const dxIn = dx/PX_PER_IN, dyIn = dy/PX_PER_IN;
+      moveSelectedByFromStart(groupStartPositions, dxIn, dyIn);
+      // Reposition each group member's element directly (no full re-render)
+      // so we never rebuild the DOM node that currently holds pointer capture.
+      selectedPlacedItems().forEach(it=>{
+        const itEl = itemElById[it.id];
+        if(itEl){ itEl.style.left=(it.xIn*PX_PER_IN)+'px'; itEl.style.top=(it.yIn*PX_PER_IN)+'px'; }
+      });
+      renderAxleRow();
+    } else {
+      let newXIn = clamp(startXIn + dx/PX_PER_IN, 0, maxXIn());
+      let newYIn = clamp(startYIn + dy/PX_PER_IN, 0, maxYIn());
+      item.xIn = newXIn; item.yIn = newYIn;
+      el.style.left = (newXIn*PX_PER_IN)+'px';
+      el.style.top = (newYIn*PX_PER_IN)+'px';
+      renderAxleRow();
+    }
+  });
+  function endDrag(e){
+    if(pointerId === null || e.pointerId !== pointerId) return;
+    try{ el.releasePointerCapture(pointerId); }catch(err){}
+    pointerId = null;
+    el.classList.remove('dragging');
+    if(moved){
+      persistWorking(); renderAxleRow();
+    } else {
+      undoStack.pop(); // no real change happened, drop the undo snapshot we pushed
+      toggleSelected(item.id); // a plain tap toggles selection, same as the native app
+    }
+    isGroup = false; groupStartPositions = null;
+  }
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+}
+function clamp(v, lo, hi){ return Math.min(Math.max(v, lo), hi); }
+
+// Drag-to-select on empty trailer floor (mouse only, so touch scrolling is
+// never intercepted) plus click-empty-to-deselect (both input types).
+function attachSurfaceSelection(surface, layer){
+  let pointerId=null, startX=0, startY=0, moved=false, box=null;
+
+  surface.addEventListener('pointerdown', (e)=>{
+    if(e.pointerType !== 'mouse' || e.button !== 0) return;
+    pointerId = e.pointerId;
+    surface.setPointerCapture(pointerId);
+    const rect = surface.getBoundingClientRect();
+    startX = e.clientX - rect.left; startY = e.clientY - rect.top;
+    moved = false;
+  });
+  surface.addEventListener('pointermove', (e)=>{
+    if(pointerId===null || e.pointerId!==pointerId) return;
+    const rect = surface.getBoundingClientRect();
+    const curX = e.clientX - rect.left, curY = e.clientY - rect.top;
+    if(Math.abs(curX-startX) > 4 || Math.abs(curY-startY) > 4) moved = true;
+    if(!moved) return;
+    if(!box){ box = document.createElement('div'); box.className='marquee-box'; surface.appendChild(box); }
+    const left = Math.min(startX,curX), top = Math.min(startY,curY);
+    box.style.left=left+'px'; box.style.top=top+'px';
+    box.style.width=Math.abs(curX-startX)+'px'; box.style.height=Math.abs(curY-startY)+'px';
+  });
+  function endSel(e){
+    if(pointerId===null || e.pointerId!==pointerId) return;
+    try{ surface.releasePointerCapture(pointerId); }catch(err){}
+    pointerId = null;
+    if(moved && box){
+      const bx=parseFloat(box.style.left), by=parseFloat(box.style.top);
+      const bw=parseFloat(box.style.width), bh=parseFloat(box.style.height);
+      const hitIds = [];
+      state.placedItems.filter(it=>it.layer===layer).forEach(it=>{
+        const lib = libById(it.libraryItemId); if(!lib) return;
+        const ix = it.xIn*PX_PER_IN, iy = it.yIn*PX_PER_IN;
+        const iw = footprintLen(it,lib)*PX_PER_IN, ih = footprintWid(it,lib)*PX_PER_IN;
+        if(ix < bx+bw && ix+iw > bx && iy < by+bh && iy+ih > by) hitIds.push(it.id);
+      });
+      if(hitIds.length) addToSelection(hitIds);
+    } else if(!moved){
+      clearSelection();
+    }
+    if(box){ box.remove(); box=null; }
+    moved = false;
+  }
+  surface.addEventListener('pointerup', endSel);
+  surface.addEventListener('pointercancel', endSel);
+  // Touch fallback: a stationary tap on empty background still deselects,
+  // without any of the mouse-only marquee/capture logic above running.
+  surface.addEventListener('click', (e)=>{ if(e.target===surface) clearSelection(); });
+}
+
+// ---------- Item action modal ----------
+function openItemModal(item, lib){
+  const colors = ['#f0c419','#e07a1f','#5da85d','#4a90d9','#c1440e','#8e6cc7','#e0e0e0'];
+  // Excludes the item's own current layer -- leaving it in the picker meant
+  // "Move to layer" defaulted to a no-op (moving an item to the layer it's
+  // already on) unless the user noticed and manually changed the dropdown,
+  // which looked exactly like the buttons doing nothing.
+  const otherLayers = state.activeLayers.filter(l=>l!==item.layer);
+  const html = `
+    <div class="modal-overlay" id="itemModalOverlay">
+      <div class="modal" style="position:relative;">
+        <button class="m-close" id="itemModalClose">&times;</button>
+        <h2>${escapeHtml(displayName(item, lib))}</h2>
+        <div class="field">
+          <label>Name</label>
+          <input id="im-name" value="${escapeAttr(displayName(item, lib))}">
+        </div>
+        <div class="field">
+          <label>Weight (lbs)</label>
+          <input id="im-weight" type="number" value="${displayWeight(item, lib)}">
+        </div>
+        <div class="field">
+          <label>Color</label>
+          <div class="color-swatches" id="im-colors">
+            ${colors.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c};${((item.customColor||'#f0c419')===c)?'border-color:#212121;':''}"></button>`).join('')}
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="m-secondary" id="im-rotate">⟳ Rotate</button>
+          <button class="m-secondary" id="im-copy">⧉ Copy</button>
+        </div>
+        ${otherLayers.length>0 ? `
+        <div class="field">
+          <label>Move or copy to which layer</label>
+          <select id="im-layer-target">${otherLayers.map(l=>`<option value="${l}">${layerNames[l]}</option>`).join('')}</select>
+        </div>
+        <div class="modal-actions">
+          <button class="m-secondary" id="im-copy-layer">Copy to layer</button>
+          <button class="m-secondary" id="im-move-layer">Move to layer</button>
+        </div>` : `
+        <div style="font-size:11px;color:var(--muted);margin:2px 0 12px;">Add a Stack Layer to move or copy this item to a different layer.</div>`}
+        <div class="modal-actions">
+          <button class="m-secondary" id="im-lock">${item.locked?'Unlock':'Lock'}</button>
+          <button class="m-danger" id="im-remove">Remove</button>
+        </div>
+        <div class="modal-actions">
+          <button class="m-primary" id="im-save">Save changes</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalRoot').innerHTML = html;
+  const overlay = document.getElementById('itemModalOverlay');
+  overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeModal(); });
+  document.getElementById('itemModalClose').addEventListener('click', closeModal);
+
+  document.getElementById('im-colors').querySelectorAll('.swatch').forEach(sw=>{
+    sw.addEventListener('click', ()=>{
+      pushUndo();
+      item.customColor = sw.dataset.c;
+      persistWorking(); renderLayerPanels(); closeModal();
+    });
+  });
+  document.getElementById('im-rotate').addEventListener('click', ()=>{
+    pushUndo();
+    item.rotated = !item.rotated;
+    const mLenIn = state.truckConfig.trailerLengthIn - footprintLen(item, lib);
+    const mWidIn = state.truckConfig.trailerWidthIn - footprintWid(item, lib);
+    item.xIn = clamp(item.xIn, 0, Math.max(0,mLenIn));
+    item.yIn = clamp(item.yIn, 0, Math.max(0,mWidIn));
+    persistWorking(); renderAll(); closeModal();
+  });
+  document.getElementById('im-lock').addEventListener('click', ()=>{
+    pushUndo();
+    item.locked = !item.locked;
+    persistWorking(); renderLayerPanels(); closeModal();
+  });
+  document.getElementById('im-copy').addEventListener('click', ()=>{
+    pushUndo();
+    const maxXIn = Math.max(0, state.truckConfig.trailerLengthIn - footprintLen(item, lib));
+    state.placedItems.push(Object.assign({}, item, {id:uid(), xIn: clamp(item.xIn+12,0,maxXIn)}));
+    persistWorking(); renderAll(); closeModal();
+  });
+  if(otherLayers.length>0){
+    document.getElementById('im-copy-layer').addEventListener('click', ()=>{
+      pushUndo();
+      const layer = parseInt(document.getElementById('im-layer-target').value,10);
+      state.placedItems.push(Object.assign({}, item, {id:uid(), layer}));
+      persistWorking(); renderAll(); closeModal();
+    });
+    document.getElementById('im-move-layer').addEventListener('click', ()=>{
+      pushUndo();
+      item.layer = parseInt(document.getElementById('im-layer-target').value,10);
+      persistWorking(); renderAll(); closeModal();
+    });
+  }
+  document.getElementById('im-remove').addEventListener('click', ()=>{
+    pushUndo();
+    state.placedItems = state.placedItems.filter(it=>it.id!==item.id);
+    persistWorking(); renderAll(); closeModal();
+  });
+  document.getElementById('im-save').addEventListener('click', ()=>{
+    pushUndo();
+    const name = document.getElementById('im-name').value.trim();
+    const weight = parseFloat(document.getElementById('im-weight').value);
+    item.customName = (name && name !== lib.name) ? name : null;
+    item.customWeightLbs = (!isNaN(weight) && weight !== lib.weightLbs) ? weight : null;
+    persistWorking(); renderAll(); closeModal();
+  });
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+// ---------- Batch action modal (multi-select) ----------
+function openBatchModal(){
+  const items = selectedPlacedItems();
+  const n = items.length;
+  if(n===0){ closeModal(); return; }
+  const allLocked = items.every(it=>it.locked);
+  const colors = ['#f0c419','#e07a1f','#5da85d','#4a90d9','#c1440e','#8e6cc7','#e0e0e0'];
+  // Same reasoning as the single-item modal: if every selected item is
+  // already on the same one layer, exclude that layer so the default
+  // dropdown pick is never a silent no-op. If the selection spans layers
+  // (e.g. items tapped into it from more than one panel), there's no single
+  // "current" layer to exclude, so all active layers stay eligible targets.
+  const commonLayers = new Set(items.map(it=>it.layer));
+  const otherLayers = state.activeLayers.filter(l=> !(commonLayers.size===1 && commonLayers.has(l)));
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="batchModalOverlay">
+      <div class="modal" style="position:relative;">
+        <button class="m-close" id="batchModalClose">&times;</button>
+        <h2>${n} item${n===1?'':'s'} selected</h2>
+        <div class="field">
+          <label>Set name for all (leave blank to keep individual names)</label>
+          <input id="bm-name" placeholder="e.g. Pack A">
+        </div>
+        <div class="field">
+          <label>Set weight for all, lbs (leave blank to keep individual weights)</label>
+          <input id="bm-weight" type="number" placeholder="e.g. 300">
+        </div>
+        <div class="modal-actions">
+          <button class="m-primary" id="bm-save-details" style="flex:1 1 100%;">Apply name / weight</button>
+        </div>
+        <div class="field">
+          <label>Color (applies immediately)</label>
+          <div class="color-swatches" id="bm-colors">
+            ${colors.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c};"></button>`).join('')}
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="m-secondary" id="bm-rotate">⟳ Rotate all</button>
+          <button class="m-secondary" id="bm-copy">⧉ Copy</button>
+        </div>
+        ${otherLayers.length>0 ? `
+        <div class="field">
+          <label>Move or copy to which layer</label>
+          <select id="bm-layer-target">${otherLayers.map(l=>`<option value="${l}">${layerNames[l]}</option>`).join('')}</select>
+        </div>
+        <div class="modal-actions">
+          <button class="m-secondary" id="bm-copy-layer">Copy to layer</button>
+          <button class="m-secondary" id="bm-move-layer">Move to layer</button>
+        </div>` : `
+        <div style="font-size:11px;color:var(--muted);margin:2px 0 12px;">Add a Stack Layer to move or copy these items to a different layer.</div>`}
+        <div class="modal-actions">
+          <button class="m-secondary" id="bm-lock">${allLocked?'Unlock all':'Lock all'}</button>
+          <button class="m-danger" id="bm-remove">Remove all</button>
+        </div>
+        <div class="modal-actions">
+          <button class="m-secondary" id="bm-clear">Clear selection</button>
+        </div>
+      </div>
+    </div>`;
+  const overlay = document.getElementById('batchModalOverlay');
+  overlay.addEventListener('click',(e)=>{ if(e.target===overlay) closeModal(); });
+  document.getElementById('batchModalClose').addEventListener('click', closeModal);
+
+  document.getElementById('bm-save-details').addEventListener('click', ()=>{
+    const name = document.getElementById('bm-name').value.trim();
+    const weightRaw = document.getElementById('bm-weight').value;
+    const weight = weightRaw === '' ? null : parseFloat(weightRaw);
+    updateSelectedDetails(name || null, weight);
+    closeModal();
+  });
+  document.getElementById('bm-colors').querySelectorAll('.swatch').forEach(sw=>{
+    sw.addEventListener('click', ()=>{ updateSelectedColor(sw.dataset.c); closeModal(); });
+  });
+  document.getElementById('bm-rotate').addEventListener('click', ()=>{ rotateSelected(); closeModal(); });
+  document.getElementById('bm-copy').addEventListener('click', ()=>{ copySelected(); closeModal(); });
+  if(otherLayers.length>0){
+    document.getElementById('bm-copy-layer').addEventListener('click', ()=>{
+      const layer = parseInt(document.getElementById('bm-layer-target').value,10);
+      copySelectedToLayer(layer); closeModal();
+    });
+    document.getElementById('bm-move-layer').addEventListener('click', ()=>{
+      const layer = parseInt(document.getElementById('bm-layer-target').value,10);
+      moveSelectedToLayer(layer); closeModal();
+    });
+  }
+  document.getElementById('bm-lock').addEventListener('click', ()=>{ lockSelected(!allLocked); closeModal(); });
+  document.getElementById('bm-remove').addEventListener('click', ()=>{
+    removeSelected(); closeModal();
+  });
+  document.getElementById('bm-clear').addEventListener('click', ()=>{ clearSelection(); closeModal(); });
+}
+
+// ---------- Library tab ----------
+function renderLibraryTab(){
+  const root = document.getElementById('libraryList');
+  if(state.library.length===0){
+    root.innerHTML = '<div class="empty-note">No items yet -- add one below.</div>';
+    return;
+  }
+  root.innerHTML = '';
+  state.library.forEach(li=>{
+    const div = document.createElement('div');
+    div.className = 'lib-item';
+    div.innerHTML = `
+      <div class="fields">
+        <div class="full"><label>Name</label><input data-f="name" value="${escapeAttr(li.name)}"></div>
+        <div><label>Length (in)</label><input data-f="lengthIn" type="number" value="${li.lengthIn}"></div>
+        <div><label>Width (in)</label><input data-f="widthIn" type="number" value="${li.widthIn}"></div>
+        <div class="full"><label>Weight (lbs)</label><input data-f="weightLbs" type="number" value="${li.weightLbs}"></div>
+      </div>
+      <button class="del-btn">Delete</button>`;
+    div.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const f = inp.dataset.f;
+        li[f] = (f==='name') ? inp.value : parseFloat(inp.value)||0;
+        persistLibrary(); renderTray(); renderAxleRow(); renderLayerPanels();
+      });
+    });
+    div.querySelector('.del-btn').addEventListener('click', ()=>{
+      pushUndo(); // Undo restores this library item and any placed items removed with it
+      state.library = state.library.filter(x=>x.id!==li.id);
+      state.placedItems = state.placedItems.filter(it=>it.libraryItemId!==li.id);
+      persistLibrary(); persistWorking(); renderAll();
+    });
+    root.appendChild(div);
+  });
+}
+document.getElementById('addLibBtn').addEventListener('click', ()=>{
+  state.library.push({id:uid(), name:'New Item', lengthIn:48, widthIn:24, weightLbs:100});
+  persistLibrary(); renderLibraryTab(); renderTray();
+});
+
+// ---------- Settings tab ----------
+const settingsFields = [
+  {group:'Trailer geometry', items:[
+    ['trailerLengthIn','Trailer length (in)'],['trailerWidthIn','Trailer width (in)'],
+    ['kingpinOffsetFromNoseIn','Kingpin offset from nose (in)'],
+    ['kingpinToTrailerAxleIn','Kingpin to trailer axle, KPRA (in)']
+  ]},
+  {group:'Tractor geometry', items:[
+    ['wheelbaseIn','Wheelbase (in)'],['kingpinOffsetFromDriveIn','Kingpin offset from drive (in)']
+  ]},
+  {group:'Tare weights', items:[
+    ['steerTareLbs','Steer tare (lbs)'],['driveTareLbs','Drive tare (lbs)'],['trailerTareLbs','Trailer tare (lbs)']
+  ]},
+  {group:'Legal limits', items:[
+    ['steerLimitLbs','Steer limit (lbs)'],['driveLimitLbs','Drive limit (lbs)'],
+    ['trailerLimitLbs','Trailer limit (lbs)'],['grossWeightLimitLbs','Gross weight limit (lbs)']
+  ]}
+];
+function renderSettingsTab(){
+  const root = document.getElementById('settingsForm');
+  root.innerHTML = settingsFields.map(g=>`
+    <div class="settings-group">
+      <h3>${g.group}</h3>
+      <div class="settings-grid">
+        ${g.items.map(([key,label])=>`
+          <div>
+            <label>${label}</label>
+            <input data-k="${key}" type="number" step="any" value="${state.truckConfig[key]}">
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+  root.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const v = parseFloat(inp.value);
+      if(!isNaN(v)){
+        pushUndo();
+        state.truckConfig[inp.dataset.k] = v;
+        persistWorking(); renderAxleRow(); renderLayerPanels();
+      }
+    });
+  });
+}
+document.getElementById('resetSettingsBtn').addEventListener('click', ()=>{
+  pushUndo();
+  state.truckConfig = defaultTruckConfig();
+  persistWorking(); renderAll();
+});
+
+// ---------- Truck name ----------
+document.getElementById('truckNameInput').addEventListener('change', (e)=>{
+  state.truckName = e.target.value;
+  persistWorking();
+});
+
+// ---------- Undo ----------
+document.getElementById('undoBtn').addEventListener('click', doUndo);
+
+// ---------- Keyboard shortcuts ----------
+document.addEventListener('keydown', (e)=>{
+  const activeTag = document.activeElement && document.activeElement.tagName;
+  const isTyping = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
+
+  if(e.key === 'Escape'){
+    // A modal open takes priority -- Escape closes that first; only clears
+    // the selection if nothing's open, so it never does both in one press.
+    const modalOpen = document.getElementById('modalRoot').innerHTML.trim() !== '';
+    if(modalOpen) closeModal(); else clearSelection();
+    return;
+  }
+  // Delete (forward-delete) and Backspace both map to "the delete key" on
+  // Mac keyboards, so both are honored -- but only away from text fields, so
+  // this never eats a keystroke while renaming a library item or editing a
+  // weight.
+  if((e.key === 'Delete' || e.key === 'Backspace') && !isTyping && state.selectedItemIds.length > 0){
+    e.preventDefault();
+    removeSelected();
+  }
+});
+
+// ---------- Tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    ['packer','library','settings'].forEach(t=>{
+      document.getElementById('tab-'+t).classList.toggle('hidden', t!==btn.dataset.tab);
+    });
+  });
+});
+
+// ---------- Saved loads ----------
+document.getElementById('saveLoadBtn').addEventListener('click', openSaveModal);
+document.getElementById('openLoadsBtn').addEventListener('click', openLoadsModal);
+document.getElementById('selectionActionsBtn').addEventListener('click', openBatchModal);
+document.getElementById('selectionClearBtn').addEventListener('click', clearSelection);
+
+function openSaveModal(){
+  const existing = state.savedLoads.map(l=>l.name.toLowerCase());
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="saveOverlay">
+      <div class="modal" style="position:relative;">
+        <button class="m-close" id="saveClose">&times;</button>
+        <h2>Save Load</h2>
+        <div class="field">
+          <label>Load name</label>
+          <input id="save-name" placeholder="e.g. Truck 3 - Tuesday run">
+        </div>
+        <div id="save-warn" style="font-size:12px;color:var(--muted);"></div>
+        <div class="modal-actions">
+          <button class="m-primary" id="save-confirm">Save</button>
+        </div>
+      </div>
+    </div>`;
+  const overlay = document.getElementById('saveOverlay');
+  overlay.addEventListener('click',(e)=>{ if(e.target===overlay) closeModal(); });
+  document.getElementById('saveClose').addEventListener('click', closeModal);
+  const nameInput = document.getElementById('save-name');
+  nameInput.addEventListener('input', ()=>{
+    document.getElementById('save-warn').textContent =
+      existing.includes(nameInput.value.trim().toLowerCase()) ? 'A saved load with this name already exists -- saving will overwrite it.' : '';
+  });
+  document.getElementById('save-confirm').addEventListener('click', ()=>{
+    const name = nameInput.value.trim();
+    if(!name) return;
+    const existingId = state.savedLoads.find(l=>l.name.toLowerCase()===name.toLowerCase());
+    const snapshot = {
+      id: existingId ? existingId.id : uid(), name,
+      savedAtMillis: Date.now(), truckName: state.truckName,
+      truckConfig: JSON.parse(JSON.stringify(state.truckConfig)),
+      activeLayers: state.activeLayers.slice(),
+      placedItems: JSON.parse(JSON.stringify(state.placedItems))
+    };
+    const idx = state.savedLoads.findIndex(l=>l.id===snapshot.id);
+    if(idx>=0) state.savedLoads[idx]=snapshot; else state.savedLoads.push(snapshot);
+    persistSavedLoads();
+    closeModal();
+  });
+}
+
+function openLoadsModal(){
+  const sorted = state.savedLoads.slice().sort((a,b)=>b.savedAtMillis-a.savedAtMillis);
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="loadsOverlay">
+      <div class="modal" style="position:relative;">
+        <button class="m-close" id="loadsClose">&times;</button>
+        <h2>Saved Loads</h2>
+        <button class="m-secondary" id="new-load-btn" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);margin-bottom:14px;">+ Start New Load (clears current truck)</button>
+        <div id="loads-list">
+          ${sorted.length===0 ? '<div class="empty-note">No saved loads yet.</div>' :
+            sorted.map(l=>`
+              <div class="saved-load-row">
+                <div class="info">
+                  <div class="name">${escapeHtml(l.name)}</div>
+                  <div class="meta">${l.placedItems.length} item${l.placedItems.length===1?'':'s'} &middot; ${new Date(l.savedAtMillis).toLocaleString()}</div>
+                </div>
+                <div class="actions">
+                  <button class="open-btn" data-id="${l.id}" data-act="open">Open</button>
+                  <button class="del-btn" data-id="${l.id}" data-act="del">Delete</button>
+                </div>
+              </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  const overlay = document.getElementById('loadsOverlay');
+  overlay.addEventListener('click',(e)=>{ if(e.target===overlay) closeModal(); });
+  document.getElementById('loadsClose').addEventListener('click', closeModal);
+  document.getElementById('new-load-btn').addEventListener('click', ()=>{
+    pushUndo(); // Undo (top bar) brings the cleared truck back
+    state.placedItems = []; state.activeLayers=[1]; state.addToLayer=1;
+    state.truckName = '';
+    persistWorking(); renderAll(); closeModal();
+  });
+  document.getElementById('loads-list').querySelectorAll('button[data-act]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const load = state.savedLoads.find(l=>l.id===btn.dataset.id);
+      if(!load) return;
+      if(btn.dataset.act==='open'){
+        pushUndo(); // Undo (top bar) brings back whatever this replaced
+        state.placedItems = JSON.parse(JSON.stringify(load.placedItems));
+        state.activeLayers = load.activeLayers.slice();
+        state.truckConfig = Object.assign(defaultTruckConfig(), load.truckConfig);
+        state.truckName = load.truckName;
+        persistWorking(); renderAll(); closeModal();
+      } else if(btn.dataset.act==='del'){
+        // Saved loads live outside the placedItems undo stack, so a mis-tap
+        // here would otherwise be unrecoverable -- a toast + Undo button for
+        // a few seconds covers that without a blocking confirm dialog.
+        state.savedLoads = state.savedLoads.filter(l=>l.id!==load.id);
+        persistSavedLoads();
+        showUndoDeleteToast(load);
+        openLoadsModal();
+      }
+    });
+  });
+}
+
+// ---------- Print ----------
+document.getElementById('printBtn').addEventListener('click', ()=>{
+  buildPrintArea();
+  window.print();
+});
+function statusCell(total, limit){
+  const over = total > limit;
+  const color = over ? '#c62828' : '#2e7d32';
+  return `<td style="color:${color};font-weight:800;">${over?'OVER':'OK'}</td>`;
+}
+function buildPrintArea(){
+  const cfg = state.truckConfig;
+  const axle = computeAxleWeights(state.placedItems, cfg);
+  // Fill a landscape page width instead of the old fixed 0.55 shrink: target
+  // ~960px (a safe usable width on a landscape Letter/A4 page after margins,
+  // at the ~96 CSS-px/in most browsers use for print layout), scaled to
+  // whatever the trailer's actual configured length is -- so a shorter
+  // configured trailer prints bigger, not just the default 53' one.
+  const targetUsablePx = 960;
+  const scale = targetUsablePx / (cfg.trailerLengthIn * PX_PER_IN);
+  let html = `
+    <div class="print-title">AMG Rigging &mdash; Truck Pack Sheet</div>
+    <div class="print-sub">${escapeHtml(state.truckName||'(unnamed truck)')} &middot; ${new Date().toLocaleString()}</div>
+    <table class="print-axle-table">
+      <tr><th>Axle</th><th>Total</th><th>Legal limit</th><th>Status</th></tr>
+      <tr><td>Steer</td><td>${Math.round(axle.steerTotal).toLocaleString()} lb</td><td>${Math.round(axle.steerLimit).toLocaleString()} lb</td>${statusCell(axle.steerTotal,axle.steerLimit)}</tr>
+      <tr><td>Drive</td><td>${Math.round(axle.driveTotal).toLocaleString()} lb</td><td>${Math.round(axle.driveLimit).toLocaleString()} lb</td>${statusCell(axle.driveTotal,axle.driveLimit)}</tr>
+      <tr><td>Trailer</td><td>${Math.round(axle.trailerTotal).toLocaleString()} lb</td><td>${Math.round(axle.trailerLimit).toLocaleString()} lb</td>${statusCell(axle.trailerTotal,axle.trailerLimit)}</tr>
+    </table>`;
+  state.activeLayers.forEach(layer=>{
+    const items = state.placedItems.filter(it=>it.layer===layer);
+    html += `<div class="print-layer-title">${layerNames[layer]}</div>
+      <div class="print-layer-surface" style="width:${cfg.trailerLengthIn*PX_PER_IN*scale}px;height:${cfg.trailerWidthIn*PX_PER_IN*scale}px;">`;
+    items.forEach(it=>{
+      const lib = libById(it.libraryItemId);
+      if(!lib) return;
+      const lenIn = footprintLen(it, lib), widIn = footprintWid(it, lib);
+      const bg = it.customColor || '#f0c419';
+      html += `<div class="print-item" style="left:${it.xIn*PX_PER_IN*scale}px;top:${it.yIn*PX_PER_IN*scale}px;width:${lenIn*PX_PER_IN*scale}px;height:${widIn*PX_PER_IN*scale}px;background:${bg};">${escapeHtml(displayName(it,lib))}<br>${Math.round(displayWeight(it,lib))} lb</div>`;
+    });
+    html += `</div>`;
+  });
+  document.getElementById('printArea').innerHTML = html;
+}
+
+// ---------- Utils ----------
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+renderAll();
+})();
+</script>
+</body>
+</html>
